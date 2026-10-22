@@ -1,0 +1,87 @@
+-- Plany równoległe
+
+
+drop table msgs
+
+SELECT IDENTITY(int, 1,1) AS ID, * 
+INTO msgs
+FROM sys.messages
+
+select * from msgs
+
+--9,28185
+SELECT language_id, COUNT(*)
+FROM msgs
+GROUP BY language_id
+
+--11,1685
+SELECT language_id, COUNT(*)
+FROM msgs
+GROUP BY language_id 
+OPTION (MAXDOP 1) --maksymalna ilość wątków do wykorzystania
+
+
+SELECT * FROM sys.configurations WHERE name = 'cost threshold for parallelism'
+
+
+EXEC sp_configure 'show advanced options', 1
+GO
+RECONFIGURE
+GO
+
+EXEC sp_configure 'cost threshold for parallelism', 25
+GO
+RECONFIGURE
+GO
+
+-- powrót do domyślnego ustawienia
+EXEC sp_configure 'cost threshold for parallelism', 5
+GO
+RECONFIGURE
+GO
+
+EXEC sp_configure 'show advanced options', 0
+GO
+RECONFIGURE
+GO
+
+CREATE OR ALTER FUNCTION dbo.GetLangName (@langid int)
+RETURNS nvarchar(100)
+AS 
+BEGIN
+	RETURN (SELECT TOP 1 alias FROM sys.syslanguages WHERE msglangid = @langid)
+END
+GO
+
+--9,28185
+SELECT language_id, COUNT(*)
+FROM msgs
+GROUP BY language_id
+
+SELECT language_id, dbo.GetLangName(language_id) AS language, COUNT(*)
+FROM msgs
+GROUP BY language_id
+
+
+ALTER DATABASE AdventureWorks2025 SET COMPATIBILITY_LEVEL = 140 --baza ustawiona na silnik SQL Server 2017
+GO
+
+
+ALTER DATABASE AdventureWorks2025 SET COMPATIBILITY_LEVEL = 170
+
+--Funkcje skalarne wspierają parallelismu od 2019
+--https://support.microsoft.com/pl-pl/topic/kb4538581-poprawka-problemy-z-skalarnym-podkre%C5%9Bleniem-udf-w-sql-server-2022-i-2019-r-f52d3759-a8b7-a107-1ab9-7fbee264dd5d
+
+
+
+
+
+
+
+
+
+
+
+
+
+
