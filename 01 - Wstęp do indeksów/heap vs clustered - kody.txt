@@ -110,3 +110,77 @@ FROM sys.dm_db_index_physical_stats(DB_ID(), default, default, default, 'SAMPLED
 INNER JOIN sys.indexes AS i ON ips.object_id = i.object_id   AND   ips.index_id = i.index_id
 where OBJECT_NAME(ips.object_id) = 'AllData'
 ORDER BY page_count DESC;
+
+
+
+/*
+	IGNORE_DUP_KEY 	
+*/
+
+drop table AllData2
+
+SELECT TOP 6 ID, FirstName, LastName INTO AllData2
+FROM AllData ORDER BY ID desc -- 18 774 wierszy
+
+SELECT * FROM AllData2
+
+CREATE UNIQUE CLUSTERED INDEX IDX_CL_AllData2_ID ON AllData2 (ID)
+
+SELECT * FROM sys.indexes WHERE object_id = OBJECT_ID('AllData2')
+
+INSERT INTO AllData2 (ID, FirstName, LastName) VALUES 
+	('1', 'Kevin', 'Sullivan'),
+	('2', 'David', 'King'),
+	('3', 'Margie', 'Shoop'),
+	('18769', 'Annik', 'Stahl')
+
+CREATE UNIQUE CLUSTERED INDEX IDX_CL_AllData2_ID ON AllData2 (ID) 
+WITH (DROP_EXISTING = ON, IGNORE_DUP_KEY = ON)
+GO
+
+
+drop table AllData2
+
+/*
+	HEAP vs CLUSTERED INDEX
+	
+*/
+
+drop table AllData_heap
+drop table AllData_ci
+
+SELECT * FROM AllData
+
+SELECT * INTO AllData_heap
+FROM AllData WHERE 1=2
+
+SELECT * INTO AllData_ci
+FROM AllData WHERE 1=2
+
+CREATE UNIQUE CLUSTERED INDEX IDX_CL_AllData_ID ON AllData_ci (ID)
+GO
+
+select * from AllData_ci
+
+--19449
+INSERT INTO AllData_heap
+SELECT * FROM AllData
+
+--3437
+INSERT INTO AllData_ci
+SELECT * FROM AllData
+
+
+EXEC sp_spaceused 'AllData_heap'
+
+EXEC sp_spaceused 'AllData_ci'
+
+drop table AllData_heap
+drop table AllData_ci
+
+SET SHOWPLAN_TEXT ON;
+GO
+SELECT * FROM Sales.SalesOrderHeader WHERE OrderDate > '2024-01-01';
+GO
+SET SHOWPLAN_TEXT OFF;
+
