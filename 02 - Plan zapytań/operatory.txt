@@ -1,0 +1,177 @@
+--> Setup
+
+/*
+	Dostęp do danych	
+*/
+
+-- Table scan
+SELECT * FROM AllData
+
+
+ALTER TABLE AllData ADD CONSTRAINT PK_AllData PRIMARY KEY (ID)
+
+-- Clustered index scan
+SELECT * FROM AllData
+
+
+CREATE NONCLUSTERED INDEX IDX_NCL_AllData_City ON AllData (City)
+GO
+
+-- Index Scan (NonClustered)
+SELECT City FROM AllData
+
+-- Clustered Index Seek
+SELECT * FROM AllData WHERE ID = 99
+
+-- Index Seek
+SELECT ID FROM AllData WHERE City = 'London'
+
+
+-- Key Lookup
+SELECT ID, EmailAddress FROM AllData WHERE City = 'Dresden'
+
+ALTER TABLE AllData DROP CONSTRAINT PK_AllData
+
+
+
+-- RID Lookup
+SELECT ID, EmailAddress FROM AllData WHERE City = 'Dresden'
+
+ALTER TABLE AllData ADD CONSTRAINT PK_AllData PRIMARY KEY (ID)
+
+/*	 
+	Złączenia danych
+*/
+SELECT * FROM Sales.SalesOrderHeader
+
+SELECT * FROM Sales.SalesOrderDetail
+
+/*  Nested Loops  */
+SELECT 
+	soh.SalesOrderID, soh.OrderDate, soh.CustomerID,
+	sod.ProductID, sod.OrderQty, sod.UnitPrice
+FROM Sales.SalesOrderHeader AS soh
+JOIN Sales.SalesOrderDetail  AS sod ON soh.SalesOrderID = sod.SalesOrderID
+WHERE soh.SalesOrderID IN (43659, 43660, 43661)
+
+-- kolejnosc tabel w zapytaniu nie ma znaczenia
+SELECT 	
+	soh.SalesOrderID, soh.OrderDate, soh.CustomerID,
+	sod.ProductID, sod.OrderQty, sod.UnitPrice
+FROM Sales.SalesOrderDetail  AS sod
+JOIN Sales.SalesOrderHeader AS soh ON soh.SalesOrderID = sod.SalesOrderID
+WHERE soh.SalesOrderID  IN (43659, 43660, 43661)
+
+
+SELECT * FROM Sales.SalesOrderHeader 
+WHERE CustomerID = 28888
+
+
+/*  Merge Join  */
+
+SELECT 	c.*
+FROM Sales.Customer AS c
+JOIN Sales.SalesOrderHeader AS soh ON soh.CustomerID = c.CustomerID
+
+
+ALTER INDEX IX_SalesOrderHeader_CustomerID ON Sales.SalesOrderHeader DISABLE
+
+-- wymuszenie Merge Join (zamiast Hash Match)
+SELECT 	c.*
+FROM Sales.Customer AS c
+JOIN Sales.SalesOrderHeader AS soh ON soh.CustomerID = c.CustomerID
+OPTION (MERGE JOIN)
+
+ALTER INDEX IX_SalesOrderHeader_CustomerID ON Sales.SalesOrderHeader REBUILD
+
+/*  Hash Match (Join)  */
+-- Hash Match (Inner Join)
+-- tworzona jest tabela haszująca dla mniejszej tabeli (w bazie tempdb)
+-- potrafi być bardzo wydajny w przypadku dwóch bardzo dużych tabel
+
+SELECT pp.ProductID, pp.Name, ps.Name
+FROM Production.Product pp
+JOIN Production.ProductSubcategory ps
+ON ps.ProductSubcategoryID = pp.ProductSubcategoryID
+
+-- pomijanie złączenia
+SELECT pp.*
+FROM Production.Product pp LEFT JOIN Production.ProductSubcategory ps
+		ON ps.ProductSubcategoryID = pp.ProductSubcategoryID
+
+/*
+	Grupowanie
+*/
+
+
+/* Stream Aggregate */
+
+
+SELECT COUNT(*)
+FROM Production.Product
+
+
+SELECT Color, COUNT(*)
+FROM Production.Product
+GROUP BY Color
+
+CREATE INDEX IDX_Product_Color ON Production.Product (Color)
+DROP INDEX IDX_Product_Color ON Production.Product
+
+SELECT SalesOrderID, COUNT(*)
+FROM Sales.SalesOrderDetail
+GROUP BY SalesOrderID
+
+
+SELECT SalesOrderID, COUNT_BIG(*)
+FROM Sales.SalesOrderDetail
+GROUP BY SalesOrderID
+
+SELECT SalesOrderID, AVG(UnitPrice)
+FROM Sales.SalesOrderDetail
+GROUP BY SalesOrderID
+
+
+/* Hash Match (Aggregate) */
+SELECT ProductID, AVG(UnitPrice)
+FROM Sales.SalesOrderDetail
+GROUP BY ProductID
+
+/*	 
+	Usuwanie duplikatów
+*/
+
+SELECT ProductID
+FROM Sales.SalesOrderDetail
+GROUP BY ProductID
+
+SELECT DISTINCT ProductID
+FROM Sales.SalesOrderDetail
+
+SELECT Color
+FROM Production.Product
+GROUP BY Color
+
+SELECT DISTINCT Color
+FROM Production.Product
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
