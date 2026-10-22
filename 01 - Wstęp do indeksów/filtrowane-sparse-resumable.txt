@@ -1,0 +1,150 @@
+/*Filtered Index*/
+
+-- > Setup
+
+CREATE CLUSTERED INDEX IDX_CL_AllData_ID ON AllData (ID)
+GO
+
+CREATE NONCLUSTERED INDEX IDX_NCL_AllData_Country ON AllData (Country)
+GO
+
+CREATE NONCLUSTERED INDEX IDX_NCL_AllData_City ON AllData (City)
+GO
+
+
+SELECT EmailPromotion, count(*) 
+FROM AllData 
+GROUP BY EmailPromotion
+
+SELECT ID, FirstName, LastName
+FROM AllData 
+WHERE Country = 'United States' AND EmailPromotion = 1
+
+SELECT ID, FirstName, LastName
+FROM AllData WITH (INDEX (IDX_NCL_AllData_Country))
+WHERE Country = 'United States' AND EmailPromotion = 1 
+
+CREATE NONCLUSTERED INDEX IDX_NCL_AllData_Country_EmailPromotion
+ON AllData (Country)
+INCLUDE (Firstname, Lastname)
+WHERE EmailPromotion = 1
+GO
+
+SELECT ID, FirstName, LastName
+FROM AllData 
+WHERE Country = 'United States'  AND EmailPromotion = 1
+
+SELECT ID, FirstName, LastName
+FROM AllData 
+WHERE Country = 'United States'  AND EmailPromotion = 2
+
+CREATE NONCLUSTERED INDEX IDX_NCL_AllData_EmailPromotion
+ON AllData (EmailPromotion)
+INCLUDE (Firstname, Lastname)
+WHERE (EmailPromotion = 1 OR EmailPromotion = 2)
+
+CREATE NONCLUSTERED INDEX IDX_NCL_AllData_EmailPromotion
+ON AllData (EmailPromotion)
+INCLUDE (Firstname, Lastname)
+WHERE (EmailPromotion) IN (1, 2)
+
+SELECT FirstName, LastName
+FROM AllData 
+WHERE EmailPromotion IN (1,2)
+
+
+--SPARSE COLUMNS
+
+/*
+Kolumny SPARSE w SQL Server to specjalny rodzaj kolumn, które zostały zoptymalizowane pod kątem przechowywania wartości NULL. 
+Ich głównym celem jest zmniejszenie wymagań przestrzennych dla wartości NULL, 
+kosztem większego narzutu przy pobieraniu wartości niepustych.
+
+Kiedy warto stosować kolumny SPARSE
+Kolumny SPARSE warto rozważyć, gdy oszczędność miejsca wynosi co najmniej 20-40%. 
+Są szczególnie przydatne w tabelach, gdzie kolumny zawierają ponad 60% wartości NULL. 
+W takich przypadkach zastosowanie kolumn SPARSE może znacząco zoptymalizować strukturę przechowywania danych w tabeli.
+
+Właściwości kolumn SPARSE
+Kolumny SPARSE charakteryzują się następującymi cechami:
+
+	Silnik bazy danych SQL Server używa słowa kluczowego SPARSE w definicji kolumny, aby zoptymalizować przechowywanie wartości
+
+	Gdy wartość kolumny jest NULL dla dowolnego wiersza w tabeli, wartości te nie wymagają miejsca na dysku
+
+	Kolumny SPARSE są właściwością warstwy przechowywania, a nie logicznej tabeli, dlatego instrukcja SELECT ... INTO nie kopiuje 
+	właściwości kolumny SPARSE do nowej tabeli
+	
+Jak to działa?
+W przypadku przechowywania wartości NULL w kolumnie o stałej długości, takiej jak kolumna z typem danych INT, wartość NULL 
+zajmie całą długość kolumny. Jeśli jednak wartość NULL zostanie zapisana w kolumnie o zmiennej długości, takiej jak kolumna z 
+typem danych VARCHAR, zajmie ona tylko dwa bajty z długości kolumny. 
+
+Korzystając z kolumn typu Sparse, wartość NULL nie będzie zajmować miejsca niezależnie od tego, czy używane są kolumny 
+o stałej czy zmiennej długości. Ale jak wspomniano wcześniej, kompromisem są tutaj dodatkowe 4 bajty podczas przechowywania 
+wartości innych niż NULL w kolumnie rzadkiej. 
+
+Na przykład kolumna z typem danych BIGINT zużywa 8 bajtów podczas przechowywania w niej wartości rzeczywistych lub NULL. 
+Definiując tę kolumnę BIGINT jako Sparse Column, zużyje ona 0 bajtów przechowując wartości NULL, 
+ale 12 bajtów przechowując w niej wartości inne niż NULL.
+
+Próg opłacalności
+Opłacalność stosowania kolumn SPARSE zależy od typu danych i procentu wartości NULL:
+
+Dla kolumn typu BIGINT lub DATETIME, procent NULL powinien wynosić co najmniej 52%
+Dla kolumn typu INT, procent NULL powinien wynosić co najmniej 64%
+Dla kolumn typu BIT, procent NULL powinien wynosić aż 98%, aby uzyskać korzyści z optymalizacji
+
+Ogólnie zaleca się stosowanie kolumn SPARSE, gdy oszczędność miejsca wynosi co najmniej 20-40%.
+*/
+
+--https://learn.microsoft.com/en-us/sql/relational-databases/tables/use-sparse-columns?view=sql-server-ver17
+
+
+drop table UnSparsed
+
+create table UnSparsed (id int identity(1,1), a int, b varchar(100), c datetime)
+
+drop table Sparsed
+
+create table Sparsed (id int identity(1,1), a int SPARSE, b varchar(100) SPARSE, c datetime SPARSE) 
+
+
+declare @x int = 0
+while @x < 100000
+	begin
+		insert into UnSparsed values (null,null,null)
+		insert into Sparsed values (null,null,null)
+		set @x=@x+1
+	end
+go
+
+sp_spaceused 'UnSparsed'
+
+sp_spaceused 'Sparsed'
+
+--Index możliwy do wznowienia
+/*
+Index available for resumption w SQL Server to funkcja wprowadzona w SQL Server 2017 (i Azure SQL Database), 
+która pozwala na wznowienie przerwanych operacji tworzenia lub przebudowy indeksu.
+
+Jak to działa?
+	Gdy włączysz opcję RESUMABLE = ON podczas tworzenia lub przebudowy indeksu:
+
+	Operacja może być wstrzymana - ręcznie lub automatycznie (np. przez failover, brak miejsca, timeout)
+	Stan jest zapisywany - SQL Server zapamiętuje postęp operacji
+	Można wznowić - operacja kontynuuje od miejsca zatrzymania, zamiast zaczynać od nowa
+*/
+
+-- Tworzenie indeksu z możliwością wznowienia
+CREATE INDEX IX_MyIndex ON MyTable(Column1)
+WITH (RESUMABLE = ON, MAX_DURATION = 240); -- 240 minut
+
+-- Wstrzymanie operacji
+ALTER INDEX IX_MyIndex ON MyTable PAUSE;
+
+-- Wznowienie operacji
+ALTER INDEX IX_MyIndex ON MyTable RESUME;
+
+-- Przerwanie operacji
+ALTER INDEX IX_MyIndex ON MyTable ABORT;

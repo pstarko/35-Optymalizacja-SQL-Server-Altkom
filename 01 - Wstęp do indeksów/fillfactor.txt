@@ -1,0 +1,35 @@
+
+/*
+
+  FILL FACTOR
+
+*/
+
+--logical reads 890 -> 1362
+
+SELECT * FROM AllData WHERE Country = 'France'
+
+SELECT * FROM sys.indexes WHERE object_id = OBJECT_ID('AllData')
+
+ALTER TABLE AllData ADD CONSTRAINT PK_AllData PRIMARY KEY (ID)
+
+ALTER INDEX PK_AllData ON AllData
+REBUILD WITH (FILLFACTOR = 70)
+GO  
+
+
+SET STATISTICS IO ON
+SET NOCOUNT ON;
+
+DECLARE @i int = 0;
+
+WHILE @i < 10000 BEGIN
+	UPDATE AllData SET LastName = CONCAT(LastName, ' ', CONVERT(varchar(255), NEWID()))
+	WHERE ID = @i
+
+	IF @i % 100 = 0 PRINT @i;
+  SET @i += 1;
+END;
+GO
+
+select * from all
