@@ -196,3 +196,85 @@ WHERE LastName = 'Henderson' AND FirstName IN ('Cesar', 'Benjamin')
 
 SELECT * FROM AllData 
 WHERE LastName LIKE 'H%' AND FirstName = 'Benjamin'
+
+
+
+/* Computed column vs Persisted column */
+
+
+--Computed columns - wyliczalne za każdym wywołaniem
+drop table t1
+
+CREATE TABLE t1
+(
+    person_id  INT PRIMARY KEY IDENTITY, 
+    first_name NVARCHAR(100), 
+    last_name  NVARCHAR(100), 
+    dob        DATE
+);
+
+INSERT INTO 
+    t1(first_name, last_name, dob)
+VALUES
+    ('John','Walker','2023-05-01'),
+    ('Jane','Doe','2023-03-01');
+
+
+SELECT
+    person_id,
+    first_name + ' ' + last_name full_name,
+    dob
+FROM t1
+
+ALTER TABLE t1
+ADD full_name AS (first_name + ' ' + last_name);
+
+SELECT 
+    person_id, 
+    full_name, 
+    dob
+FROM 
+    t1
+
+create index idx_fullname on t1(full_name)
+
+drop table t1
+
+--Persisted computed columns
+/*
+Kolumny obliczane mogą być utrwalane. 
+Oznacza to, że SQL Server fizycznie przechowuje dane obliczonych kolumn na dysku.
+
+Gdy zmieniasz dane w tabeli, SQL Server oblicza wynik na podstawie wyrażenia kolumn wyliczanych i przechowuje wyniki w tych trwałych kolumnach fizycznie. 
+Podczas odpytywania danych z utrzymywanych kolumn obliczeniowych, 
+SQL Server musi tylko pobrać dane bez wykonywania jakichkolwiek obliczeń. 
+Pozwala to uniknąć narzutu obliczeniowego kosztem dodatkowej pamięci masowej.
+*/
+drop table t2
+
+CREATE TABLE t2(
+    person_id  INT PRIMARY KEY IDENTITY, 
+    first_name NVARCHAR(100), 
+    last_name  NVARCHAR(100), 
+    dob        DATE
+);
+
+INSERT INTO 
+    t2(first_name, last_name, dob)
+VALUES
+    ('John','Walker','2023-05-01'),
+    ('Jane','Doe','2023-03-01');
+
+ALTER TABLE t2
+ADD full_name AS (first_name + ' ' + last_name) PERSISTED;
+
+SELECT 
+    person_id, 
+    full_name, 
+    dob
+FROM 
+    t2
+create index idx_fullname on t2(full_name)
+drop table t2
+
+---
