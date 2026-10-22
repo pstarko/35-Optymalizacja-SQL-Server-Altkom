@@ -1,0 +1,1 @@
+# 35-Optymalizacja-SQL-Server-Altkom
