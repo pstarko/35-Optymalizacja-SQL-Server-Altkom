@@ -1,0 +1,85 @@
+--Plan cache
+
+SELECT * FROM sys.dm_exec_cached_plans
+
+dbcc freeproccache
+
+dECLARE @q NVARCHAR(MAX)
+	, @params NVARCHAR(MAX)
+
+SET @q = N'SELECT Color, COUNT(*) FROM Production.Product where color = @color GROUP BY Color'
+
+SET @params = N' @color NVARCHAR(64)'
+
+EXEC sp_executesql @q
+					, @params
+					, @color = 'Red'
+
+SELECT cp.usecounts
+	, cp.cacheobjtype
+	, cp.objtype
+	, txt.text
+FROM sys.dm_exec_cached_plans AS cp
+	CROSS APPLY sys.dm_exec_sql_text (cp.plan_handle) AS txt
+WHERE txt.text like '%' + '@color' + '%'
+
+--plany zapytań z których baz danych zajmują miejsce w buffer pool
+SELECT 
+	dbs.name AS database_name,
+	cplan.refcounts, usecounts, size_in_bytes/1024 AS size_in_KB, cacheobjtype, objtype, 
+	qtext.text,
+	qplan.query_plan
+FROM sys.dm_exec_cached_plans cplan
+CROSS APPLY sys.dm_exec_sql_text(plan_handle) AS qtext
+CROSS APPLY sys.dm_exec_query_plan(cplan.plan_handle) AS qplan
+JOIN sys.databases AS dbs ON dbs.database_id = qtext.dbid
+
+
+SELECT Color, COUNT(*) FROM Production.Product GROUP BY Color
+GO
+SELECT Color, COUNT(*) FROM Production.Product GROUP BY Color
+GO
+SELECT Color, COUNT(*) FROM Production.Product GROUP BY Color
+GO
+SELECT Color, COUNT(*) FROM Production.Product GROUP BY Color
+
+--otrzymam informacje o planie powyższego zapytania
+SELECT 
+	dbs.name AS database_name,
+	cplan.refcounts, usecounts, size_in_bytes/1024 AS size_in_KB, cacheobjtype, objtype, 
+	qtext.text,
+	qplan.query_plan
+FROM sys.dm_exec_cached_plans cplan
+CROSS APPLY sys.dm_exec_sql_text(plan_handle) AS qtext
+CROSS APPLY sys.dm_exec_query_plan(cplan.plan_handle) AS qplan
+JOIN sys.databases AS dbs ON dbs.database_id = qtext.dbid
+WHERE qtext.text LIKE '%Color%'
+
+EXEC sp_configure 'show advanced options', 1
+RECONFIGURE
+GO
+
+EXEC sp_configure 'optimize for ad hoc workloads', 0
+RECONFIGURE
+GO
+
+
+DBCC FREEPROCCACHE
+
+
+SELECT ID, FirstName, LastName FROM AllData WHERE City = 'Dresden'
+GO
+SELECT ID, FirstName, LastName FROM AllData WHERE City = 'Nevada'
+GO
+SELECT ID, FirstName, LastName FROM AllData WHERE City = 'Chicago'
+GO
+SELECT ID, FirstName, LastName FROM AllData WHERE City = 'London'
+GO
+
+SELECT 
+	cplan.refcounts, usecounts, size_in_bytes AS size_in_B, cacheobjtype, objtype, qtext.text, qplan.query_plan
+FROM sys.dm_exec_cached_plans cplan
+CROSS APPLY sys.dm_exec_sql_text(plan_handle) AS qtext
+CROSS APPLY sys.dm_exec_query_plan(cplan.plan_handle) AS qplan
+JOIN sys.databases AS dbs ON dbs.database_id = qtext.dbid
+WHERE qtext.text LIKE '%City%'
