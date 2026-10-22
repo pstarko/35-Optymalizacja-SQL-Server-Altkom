@@ -49,3 +49,16 @@ FROM Orders WHERE SalesOrderID = 75086
 SELECT SalesOrderID, OrderDate, Status, CustomerID, TotalDue
 FROM Orders WHERE CustomerID = 11619
 
+
+
+CREATE UNIQUE CLUSTERED INDEX CL_Ord_SalesOrderID ON Orders (SalesOrderID)
+GO
+
+CREATE NONCLUSTERED INDEX Ord_OrderDate ON Orders (OrderDate)
+INCLUDE(Status, CustomerID, TotalDue) 
+GO
+
+CREATE NONCLUSTERED INDEX Ord_CustomerID ON Orders (CustomerID)
+INCLUDE(Status, OrderDate, TotalDue)  
+GO
+
