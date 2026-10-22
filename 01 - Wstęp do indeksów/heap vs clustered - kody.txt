@@ -1,0 +1,112 @@
+/*
+	Sterta vs indeks klastrowy
+*/
+
+SELECT * FROM AllData
+
+--deoptymalizatory
+SELECT * FROM AllData 
+order by ModifiedDate
+
+SELECT distinct city FROM AllData 
+
+
+SELECT FirstName FROM AllData
+union
+SELECT firstname FROM Person.Person 
+
+
+--Deoptymalizacja przez użycie funkcji zamiast bezpośredniego kodu
+
+CREATE or alter FUNCTION par_fun
+(	
+	@val int
+)
+RETURNS numeric
+AS
+begin
+	declare @result numeric
+	select @result = sum(unitPrice) 
+	from Sales.SalesOrderDetail
+	where SalesOrderDetailID = @val
+	return @result
+end
+GO
+
+
+select 
+	top 1000
+	SalesOrderDetailID,
+	sum(unitPrice) over (partition by salesorderdetailid) as suma
+	from Sales.SalesOrderDetail
+
+select 
+	top 1000
+	SalesOrderDetailID,
+	dbo.par_fun(SalesOrderDetailID)
+	from Sales.SalesOrderDetail
+
+--------------
+EXEC sp_spaceused 'AllData'
+--sterta: AllData	18774               	5584 KB	5576 KB	8 KB	0 KB
+
+/*
+	HEAP - tabela jako sterta 
+*/
+
+SELECT * FROM sys.indexes WHERE object_id = OBJECT_ID('AllData')
+
+SELECT * FROM AllData WHERE FirstName = 'Eric'
+
+SELECT * FROM AllData WHERE Country = 'Germany'
+
+SELECT * FROM AllData WHERE ID = 1667
+
+SELECT * FROM AllData ORDER BY ID
+
+
+/*
+	CLUSTERED INDEX	
+*/
+
+CREATE CLUSTERED INDEX IDX_CL_AllData_ID ON AllData (ID)
+
+EXEC sp_spaceused 'AllData'
+--sterta: AllData	18774               	5584 KB	5576 KB	8 KB	0 KB
+--indeks: AllData	18774               	5256 KB	5184 KB	32 KB	40 KB
+
+
+SELECT * FROM AllData WHERE FirstName = 'Eric'
+
+SELECT * FROM AllData WHERE Country = 'Germany'
+
+SELECT * FROM AllData WHERE ID = 1667
+
+SELECT * FROM AllData ORDER BY ID
+
+update AllData set  LastName = 'xxx'
+
+-- wyłączenie indeksu
+ALTER INDEX IDX_CL_AllData_ID ON AllData DISABLE
+
+SELECT * FROM AllData
+
+-- przebudowa = włączenie
+ALTER INDEX IDX_CL_AllData_ID ON AllData REBUILD
+
+--https://learn.microsoft.com/en-us/sql/relational-databases/indexes/disable-indexes-and-constraints?redirectedfrom=MSDN&view=sql-server-ver16
+
+
+SELECT * FROM sys.indexes WHERE object_id = OBJECT_ID('AllData')
+
+SELECT OBJECT_SCHEMA_NAME(ips.object_id) AS schema_name,
+       OBJECT_NAME(ips.object_id) AS object_name,
+       i.name AS index_name,
+       i.type_desc AS index_type,
+       ips.avg_fragmentation_in_percent,
+       ips.avg_page_space_used_in_percent,
+       ips.page_count
+FROM sys.dm_db_index_physical_stats(DB_ID(), default, default, default, 'SAMPLED') AS ips
+INNER JOIN sys.indexes AS i ON ips.object_id = i.object_id   AND   ips.index_id = i.index_id
+where OBJECT_NAME(ips.object_id) = 'AllData'
+ORDER BY page_count DESC;
