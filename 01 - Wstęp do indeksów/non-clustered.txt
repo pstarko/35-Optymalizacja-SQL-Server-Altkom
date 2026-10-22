@@ -1,0 +1,198 @@
+/* NonClustered */
+
+select * into alldata_test from AllData
+
+create unique clustered index idx on alldata_test(id)
+
+create nonclustered index idx2 on alldata_test(country)
+
+update alldata_test set LastName = CONCAT(lastname, '_')
+
+update alldata_test set country = CONCAT(country, '_')
+
+ALTER INDEX idx2 ON alldata_test REBUILD
+
+alter table alldata_test rebuild
+
+drop table alldata_test
+
+---
+CREATE UNIQUE CLUSTERED INDEX IDX_CL_AllData_ID ON AllData (ID)
+
+CREATE NONCLUSTERED INDEX IDX_NCL_AllData_Country ON AllData (Country)
+
+EXEC sp_spaceused 'AllData'
+
+SELECT * FROM AllData
+
+SELECT * FROM AllData WHERE FirstName = 'Eric'
+
+SELECT * FROM AllData WHERE Country = 'Germany'
+
+SELECT * FROM AllData WHERE ID = 1771
+
+--logical reads 9
+SELECT count(*) FROM AllData WHERE Country = 'Germany'
+
+--logical reads 648
+SELECT count(Title) FROM AllData WHERE Country = 'Germany'
+
+SELECT ID FROM AllData WHERE Country = 'Germany'
+
+SELECT ID, LastName FROM AllData WHERE Country = 'Germany'
+
+SELECT * FROM AllData 
+WITH (INDEX ([IDX_NCL_AllData_Country])) 
+WHERE Country = 'Germany'
+
+SELECT Country, COUNT(*)
+FROM AllData
+GROUP BY Country
+
+CREATE NONCLUSTERED INDEX IDX_NCL_AllData_City ON AllData (City)
+
+SELECT City, COUNT(*)
+FROM AllData
+GROUP BY City
+ORDER BY count(*) DESC
+
+SELECT City, COUNT(*)
+FROM AllData
+GROUP BY City
+ORDER BY City DESC 
+
+
+SELECT ID, FirstName, LastName 
+FROM AllData 
+WHERE City = 'Dresden'
+
+SELECT ID, FirstName, LastName 
+FROM AllData 
+WHERE City = 'Paris'
+
+SELECT ID, FirstName, LastName 
+FROM AllData 
+WHERE 1=1 and City = 'Paris'
+
+----
+
+/*
+	NONCLUSTERED INDEX
+	INCLUDE
+	
+	Jeśli kolumna nie znajduje się w WHERE/JOIN/GROUP BY/ORDER BY, ale tylko na liście kolumn w klauzuli SELECT, 
+	używasz INCLUDE.
+
+	Klauzula INCLUDE dodaje dane na najniższym poziomie/liściu, 
+	a nie w drzewie indeksu. Powoduje to, że indeks jest mniejszy, ponieważ nie jest częścią drzewa
+
+	Kolumny INCLUDE nie są kluczowymi kolumnami w indeksie, więc nie są uporządkowane. 
+	Oznacza to, że tak naprawdę nie jest przydatny do predykatów, sortowania itp., 
+	Jak wspomniałem powyżej. Jednak może to być przydatne, jeśli masz wyszukiwanie resztkowe w kilku wierszach 
+	z kluczowych kolumn
+*/
+CREATE NONCLUSTERED INDEX IDX_NCL_AllData_City ON AllData (City)
+INCLUDE (Firstname, Lastname)
+WITH DROP_EXISTING 
+GO
+
+SELECT page_count
+FROM sys.dm_db_index_physical_stats(DB_ID(), OBJECT_ID('AllData'),4,NULL,'LIMITED')
+
+SELECT ID, FirstName, LastName 
+FROM AllData 
+WHERE City = 'Paris'
+
+SELECT ID, FirstName, LastName, ModifiedDate
+FROM AllData 
+WHERE City = 'Paris'
+
+SELECT ID, FirstName, LastName 
+FROM AllData 
+WHERE City = 'Paris'
+ORDER BY Lastname, FirstName
+
+SELECT ID, FirstName, LastName 
+FROM AllData 
+WHERE City = 'Paris'
+order by LastName
+
+--wielokolumnowy indeks
+CREATE NONCLUSTERED INDEX IDX_NCL_AllData_City 
+ON AllData (City, Lastname, Firstname)
+WITH DROP_EXISTING 
+
+SELECT ID, FirstName, LastName 
+FROM AllData 
+WHERE City = 'Paris'
+order by LastName
+
+SELECT ID, FirstName, LastName 
+FROM AllData 
+WHERE City = 'Paris'
+ORDER BY Lastname, FirstName
+
+SELECT ID, FirstName, LastName 
+FROM AllData 
+ORDER BY Lastname, FirstName
+
+SELECT ID, FirstName, LastName 
+FROM AllData 
+WHERE City in ('Paris', 'Dresden')
+order by LastName
+
+/*
+	RID LOOKUP vs KEY LOOKUP
+	
+*/
+
+
+CREATE CLUSTERED INDEX IDX_CL_AllData_ID ON AllData (ID)
+GO
+
+CREATE NONCLUSTERED INDEX IDX_NCL_AllData_City ON AllData (City)
+GO
+
+SELECT ID, FirstName, LastName
+FROM AllData 
+WHERE City = 'Dresden'
+
+DROP INDEX IDX_CL_AllData_ID ON AllData
+GO
+
+/*
+	Kolejnosć kolumn w kluczu indeksu	
+*/
+
+
+CREATE UNIQUE CLUSTERED INDEX IDX_CL_AllData_ID ON AllData (ID)
+GO
+
+CREATE NONCLUSTERED INDEX IDX_NCL_AllData_Lastname_Firstname ON AllData (Lastname, Firstname)
+
+SELECT * FROM AllData
+WHERE LastName = 'Henderson' AND FirstName = 'Benjamin'
+
+--bez zmian, jest operator AND
+SELECT * FROM AllData
+WHERE FirstName = 'Benjamin' AND LastName = 'Henderson'
+
+--też użyje indeks gdyż szuka pierwszej wartości z indeksu
+SELECT * FROM AllData
+WHERE LastName = 'Henderson' AND FirstName LIKE 'B%'
+
+SELECT * FROM AllData
+WHERE LastName = 'Henderson' 
+
+SELECT * FROM AllData
+WHERE FirstName = 'Benjamin'
+
+SELECT * FROM AllData
+WHERE LastName = 'Henderson' 
+ORDER BY FirstName
+
+SELECT * FROM AllData
+WHERE LastName = 'Henderson' AND FirstName IN ('Cesar', 'Benjamin')
+
+SELECT * FROM AllData 
+WHERE LastName LIKE 'H%' AND FirstName = 'Benjamin'
