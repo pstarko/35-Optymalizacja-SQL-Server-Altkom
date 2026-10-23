@@ -1,0 +1,89 @@
+--Statystyki
+
+
+CREATE CLUSTERED INDEX IDX_CL_AllData_ID ON AllData (ID)
+GO
+
+CREATE NONCLUSTERED INDEX IDX_NCL_AllData_Country ON AllData (Country)
+GO
+
+
+SELECT * FROM sys.stats 
+WHERE object_id = object_id('AllData')
+ORDER BY name
+
+DBCC SHOW_STATISTICS ('AllData', IDX_NCL_AllData_Country)
+
+select count(*) from alldata
+where country = 'Australia'
+
+DBCC SHOW_STATISTICS ('AllData', City)
+
+SELECT * FROM AllData 
+order by city 
+
+/*
+	Nazwa statystyk tworzonych automatycznie
+
+	_WA_Sys_0000000F_4AD81681 => wa_sys znaczy, że automatycznie, 
+	potem 16tkowo identyfikator kolumny i potem identyfikator obiektu
+	id kolumny | object_id w hex 
+
+*/
+
+SELECT 
+	column_id, CONVERT(VARBINARY(8), column_id) AS hex_column_id, 
+	object_id, CONVERT(VARBINARY(8), object_id) AS hex_object_id, 
+*
+FROM sys.columns 
+WHERE object_id = OBJECT_ID('AllData') 
+	AND name = 'City'
+
+/*
+	Rows VS Rows Sampled
+*/
+
+sp_spaceused 'AllData' 
+
+
+SELECT * FROM sys.stats WHERE object_id = object_id('Person.Person')
+
+DBCC SHOW_STATISTICS ('Person.Person', Firstname)
+
+select
+	firstname
+	from Person.Person
+where FirstName = 'Aaron'
+order by FirstName
+
+CREATE STATISTICS stat_Person_Firstname
+ON Person.Person (Firstname) 
+
+DBCC SHOW_STATISTICS ('Person.Person', stat_Person_Firstname)
+
+DROP STATISTICS Person.Person.stat_Person_Firstname
+
+CREATE STATISTICS stat_Person_Firstname
+ON Person.Person (Firstname)  
+WITH FULLSCAN
+
+
+/*
+	Statystyki filtrowane
+*/
+
+--E: 1914, A: 1914
+SELECT * FROM AllData WHERE Country = 'United Kingdom'
+
+--E: 420, A: 420
+SELECT * FROM AllData WHERE City = 'London'
+
+--kolumny skorelowane
+--E: 134,104, A: 420
+SELECT * FROM AllData
+WHERE Country = 'United Kingdom' AND City = 'London'
+
+CREATE STATISTICS stat_AllData_City_UK
+ON AllData (City)
+WHERE Country = 'United Kingdom'
+WITH FULLSCAN
