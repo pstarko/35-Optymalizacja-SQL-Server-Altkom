@@ -1,0 +1,228 @@
+/*
+VECTORY - Embeddings
+
+Embeddings
+Embeddings to listy liczbowe (wektory), które przechwytują kluczowe cechy czegoś, np. słowa, przedmiotu lub pojęcia. 
+Można je traktować jak cyfrowe odciski palców, które pomagają maszynom rozumieć i porównywać różne rzeczy. 
+Zazwyczaj są one tworzone przez modele głębokiego uczenia się i są niezwykle przydatne, ponieważ mogą pokazać, 
+jak bardzo dwie rzeczy są do siebie podobne, nawet jeśli nie są dokładnie takie same.
+
+Embeddingsy są użyteczne:
+
+    Pomiar podobieństwa: Komputery mogą z łatwością obliczyć matematyczną odległość między wektorami numerycznymi.
+    Zrozumienie semantyczne: Uchwycenie podstawowego znaczenia lub kontekstu elementów.
+    Redukcja wymiarowości: Przekształcanie złożonych danych wielowymiarowych w gęstsze i stałe rozmiary reprezentacji numerycznych, 
+                            łatwiejsze do przetworzenia przez algorytmy.
+    Wydajność: wyszukiwanie podobieństw staje się szybką operacją matematyczną na wektorach.
+*/
+
+CREATE TABLE dbo.vectors
+(
+    id INT PRIMARY KEY,
+    v VECTOR(3) NOT NULL -- Uses default base type (**float32**)
+);
+
+INSERT INTO dbo.vectors
+(
+    id,
+    v
+)
+VALUES (1, '[0.1, 2, 30]'),
+       (2, '[-100.2, 0.123, 9.876]'),
+       (3, JSON_ARRAY(1.0, 2.0, 3.0)); -- Using JSON_ARRAY to create a vector
+
+SELECT *
+FROM dbo.vectors;
+
+
+DECLARE @v AS VECTOR(3) = '[0.1, 2, 30]';
+
+SELECT @v;
+
+GO
+
+DECLARE @v AS VECTOR(3) = '[1,2,3]'; 
+SELECT   VECTORPROPERTY(@v, 'Dimensions')
+        ,VECTORPROPERTY(@v, 'BaseType');
+
+
+--metryka cosinusowa
+
+/*
+Kluczowe punkty z przykładu:
+	1. Operatory w pgvector:
+
+		VECTOR_DISTANCE('cosine', @A, @B) - odległość kosinusowa (im mniejsza, tym większe podobieństwo)
+		VECTOR_DISTANCE('euclidean', @A, @B) - odległość euklidesowa
+		Podobieństwo kosinusowe = 1 - odległość kosinusowa
+		
+2. Praktyczny przykład:
+	Tabela produkty zawiera wektory 3D reprezentujące cechy: [cena, jakość, popularność]
+
+3. Różnica między metrykami:
+	W przykładzie zobaczysz, że wektory [1,1,1] i [2,2,2] mają:
+
+	Podobieństwo kosinusowe = 1.0 (identyczny kierunek)
+	Odległość euklidesową = 1.73 (różne długości)
+	
+4. Zastosowanie praktyczne:
+Gdy szukasz produktu o cechach [0.85, 0.8, 0.6] (drogi, wysokiej jakości, średnio popularny), 
+metryka cosinusowa znajdzie produkty o podobnym "profilu", niezależnie od tego, jak "intensywne" są te cechy.
+*/
+
+-- 1. Tworzymy tabelę z przykładowymi produktami i ich wektorami cech
+CREATE TABLE produkty (
+    id int PRIMARY KEY,
+    nazwa varchar(50),
+    opis varchar(50),
+    cechy_vector VECTOR(3)  -- 3-wymiarowy wektor dla prostoty
+);
+
+
+-- 2. Wstawiamy przykładowe dane
+-- Każdy wektor reprezentuje cechy produktu: [cena, jakość, popularność]
+INSERT INTO produkty (id, nazwa, opis, cechy_vector) VALUES
+    (1, 'Laptop Gaming', 'Wysokiej klasy laptop do gier', '[0.9, 0.8, 0.7]'),
+    (2, 'Laptop Biurowy', 'Podstawowy laptop do pracy', '[0.3, 0.6, 0.8]'),
+    (3, 'Laptop Premium', 'Drogi laptop biznesowy', '[0.95, 0.9, 0.6]'),
+    (4, 'Tablet Podstawowy', 'Tani tablet do internetu', '[0.2, 0.4, 0.9]'),
+    (5, 'Tablet Pro', 'Profesjonalny tablet graficzny', '[0.8, 0.85, 0.5]');
+
+
+-- 3. Przykład wyszukiwania z metryką cosinusową
+-- Szukamy produktów podobnych do wektora zapytania [0.85, 0.8, 0.6]
+-- (reprezentuje: wysoka cena, wysoka jakość, średnia popularność)
+
+SELECT 
+    nazwa,
+    opis,
+    cechy_vector,
+    -- Obliczamy podobieństwo kosinusowe (1 - cosine distance)
+    1 - (VECTOR_DISTANCE('cosine', cechy_vector, CAST('[0.85, 0.8, 0.6]' AS VECTOR(3)))) as podobienstwo_kosinusowe,
+    -- Dla porównania - odległość euklidesowa
+    VECTOR_DISTANCE('euclidean', cechy_vector, CAST('[0.85, 0.8, 0.6]' AS VECTOR(3))) AS odleglosc_euklidesowa
+FROM produkty
+ORDER BY podobienstwo_kosinusowe
+
+
+SELECT 
+    nazwa,
+    opis,
+    cechy_vector,
+    -- Obliczamy podobieństwo kosinusowe (1 - cosine distance)
+    1 - (VECTOR_DISTANCE('cosine', cechy_vector, CAST('[0.94, 0.89, 0.6]' AS VECTOR(3)))) as podobienstwo_kosinusowe
+FROM produkty
+ORDER BY podobienstwo_kosinusowe
+
+/*
+Funkcja odległości wektorowej
+Aby określić, jak daleko od siebie znajdują się dwa wektory, możemy użyć metryki odległości, 
+metody lub wzoru do pomiaru różnicy między nimi.
+
+VECTOR_DISTANCE (distance_metric, vector1, vector2), gdzie distance_metric może być:
+
+    Cosinus: mierzy cosinus kąta między dwoma wektorami. Jest to miara orientacji, a nie wielkości. 
+                Oblicza się ją jako iloczyn skalarny wektorów podzielony przez iloczyn ich długości.
+    Euklidesowa: uzyskuje się ją jako pierwiastek kwadratowy z sumy (Ai-Bi) do kwadratu.
+    Skalarna: ujemny iloczyn skalarny oblicza się jako ujemny wynik sumy (Ai * Bi).
+*/
+
+
+/*
+Funkcja wyszukiwania wektorów:
+
+Znajduje wektory najbliższe danemu wektorowi, wykorzystując algorytm wyszukiwania przybliżonego. 
+Oznacza to, że nie sprawdza każdego z nich, a jedynie tyle, ile potrzeba, aby uzyskać szybki i dość dokładny wynik przy 
+użyciu wybranej miary odległości.
+*/
+--Przykład
+DECLARE      @Products
+    TABLE   (ProductId int
+            ,ProductName nvarchar(120)
+            ,Embedding vector(3));
+ 
+-- Embeddings values for: shirt-ness, color aspect, and casual wear
+INSERT INTO  @Products
+    VALUES   (101,'Blue T-Shirt',        '[0.10, 0.50, 0.90]')
+            ,(102,'Red T-Shirt',         '[0.20, 0.40, 0.80]')
+            ,(103,'Green Polo Shirt',    '[0.30, 0.60, 0.70]')
+            ,(104,'Blue Jeans',          '[0.80, 0.10, 0.20]')
+            ,(105,'Denim Jacket',        '[0.70, 0.20, 0.30]')
+            ,(106,'Striped Blue T-Shirt','[0.15, 0.55, 0.92]');
+ 
+DECLARE @queryProductEmbedding VECTOR(3);
+
+SELECT       @queryProductEmbedding = Embedding
+    FROM     @Products
+    WHERE    ProductId = 105;
+ 
+SELECT       p.ProductId
+            ,p.ProductName
+            ,VECTOR_DISTANCE('cosine', @queryProductEmbedding, p.Embedding) AS CosineSimilarityDistance
+    FROM     @Products AS p
+    --WHERE    p.ProductId <> 101 
+    ORDER BY CosineSimilarityDistance ;
+
+
+drop table przykladowe_wektory
+-- 1. Tworzymy tabelę z przykładowymi wektorami
+CREATE TABLE przykladowe_wektory (
+    id int PRIMARY KEY,
+    nazwa varchar(50),
+    wektor VECTOR(3)  -- 3-wymiarowe wektory dla łatwości zrozumienia
+);
+
+-- 2. Wstawiamy przykładowe dane (punkty w przestrzeni 3D)
+INSERT INTO przykladowe_wektory (id, nazwa, wektor) VALUES
+    (1, 'Punkt A', '[1, 2, 3]'),
+    (2, 'Punkt B', '[4, 5, 6]'),
+    (3, 'Punkt C', '[1, 2, 4]'),  -- bardzo podobny do A
+    (4, 'Punkt D', '[10, 20, 30]'), -- daleko od wszystkich
+    (5, 'Punkt E', '[1.1, 2.1, 3.1]'); -- bardzo blisko A
+
+-- 3. Sprawdźmy nasze dane
+SELECT * FROM przykladowe_wektory;
+
+-- 4. KLUCZOWY PRZYKŁAD: Obliczamy odległości euklidesowe od Punktu A
+SELECT
+  p.nazwa,
+  p.wektor,
+  VECTOR_DISTANCE('euclidean', p.wektor, CAST('[1,2,3]' AS VECTOR(3))) odleglosc_od_A
+FROM przykladowe_wektory p
+ORDER BY odleglosc_od_A
+
+-- 5. Znajdźmy 3 najbliższe punkty do Punktu A
+SELECT 
+    top 3 nazwa,
+    wektor,
+    VECTOR_DISTANCE('euclidean', wektor, CAST('[1,2,3]' AS VECTOR(3))) AS odleglosc
+FROM przykladowe_wektory
+WHERE nazwa not in ('Punkt A')  -- wykluczamy sam punkt A
+ORDER BY odleglosc
+
+-- 6. Przykład z indeksem dla wydajności (dla większych zbiorów danych)
+-- W SQL Server 2025 RTM indeksy wektorowe są funkcją preview i wymagają najpierw włączenia.
+/*
+    Indeks wymaga minimum 100 wierszy z niepustymi wektorami. 
+    Przy mniejszych zbiorach VECTOR_DISTANCE bez indeksu działa poprawnie.
+*/
+
+ALTER DATABASE SCOPED CONFIGURATION SET PREVIEW_FEATURES = ON;
+
+CREATE VECTOR INDEX idx_wektor
+ON przykladowe_wektory (wektor)
+WITH (METRIC = 'EUCLIDEAN')
+
+--Po założeniu indeksu lepiej używać VECTOR_SEARCH:
+
+DECLARE @qv VECTOR(3) = '[1,2,3]';
+
+SELECT t.nazwa, t.wektor, s.distance AS odleglosc
+FROM VECTOR_SEARCH(
+    TABLE = przykladowe_wektory AS t,
+    COLUMN = wektor,
+    SIMILAR_TO = @qv,
+    METRIC = 'euclidean',
+    TOP_N = 3
+) AS s
+ORDER BY s.distance
