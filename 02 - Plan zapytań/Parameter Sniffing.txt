@@ -1,0 +1,152 @@
+select * from AllData
+
+CREATE UNIQUE CLUSTERED INDEX IDX_CL_AllData_ID ON AllData (ID)
+GO
+
+CREATE NONCLUSTERED INDEX IDX_NCL_AllData_City ON AllData (City)
+GO
+
+SELECT * FROM sys.database_scoped_configurations 
+
+DBCC FREEPROCCACHE
+
+set statistics io on
+
+--102
+SELECT ID, FirstName, LastName FROM AllData WHERE City = 'Dresden'
+
+--648
+SELECT ID, FirstName, LastName FROM AllData WHERE City = 'Paris'
+
+
+CREATE OR ALTER PROC GetAllDataForCity @City nvarchar(30)
+AS
+BEGIN
+	SELECT ID, FirstName, LastName FROM AllData WHERE City = @City
+END
+GO
+
+
+EXEC GetAllDataForCity 'Paris'
+
+EXEC GetAllDataForCity 'Dresden'
+
+DBCC FREEPROCCACHE
+GO
+
+-- Rozwiązanie 1
+-- sp_recompile
+EXEC sp_recompile 'GetAllDataForCity'
+
+
+-- Rozwiązanie 2
+-- WITH RECOMPILE
+CREATE OR ALTER PROC GetAllDataForCity @City nvarchar(30)
+WITH RECOMPILE
+AS
+BEGIN
+	SELECT ID, FirstName, LastName FROM AllData WHERE City = @City
+END
+GO
+
+EXEC GetAllDataForCity 'Paris'
+
+EXEC GetAllDataForCity 'Dresden'
+
+-- Rozwiązanie 3
+-- OPTION (RECOMPILE) -- podobny jak powyższy, ale na poziomie instrukcji, a nie proc
+CREATE OR ALTER PROC GetAllDataForCity @City nvarchar(30)
+AS
+BEGIN
+	SELECT ID, FirstName, LastName FROM AllData WHERE City = @City OPTION (RECOMPILE)
+END
+GO
+
+EXEC GetAllDataForCity 'Paris'
+
+EXEC GetAllDataForCity 'Dresden'
+
+-- Rozwiązanie 4
+-- OPTIMIZE FOR UNKNOWN (użyje średniej wartości ze statystyk do oszacowania planu) - nie będzie skompilowanej wartości we właściwościach
+-- plan ten będzie nadal buforowany w przeciwieństwie do WITH RECOMPILE (generuje nowy plan za każdym razem)
+
+CREATE OR ALTER PROC GetAllDataForCity @City nvarchar(30)
+AS
+BEGIN
+	SELECT ID, FirstName, LastName FROM AllData WHERE City = @City OPTION (OPTIMIZE FOR UNKNOWN)
+END
+GO
+
+
+EXEC GetAllDataForCity 'Dresden'
+GO
+
+EXEC GetAllDataForCity 'Paris'
+GO
+
+-- Rozwiązanie 5
+-- OPTIMIZE FOR X
+CREATE OR ALTER PROC GetAllDataForCity @City nvarchar(30)
+AS
+BEGIN
+	SELECT ID, FirstName, LastName FROM AllData WHERE City = @City OPTION (OPTIMIZE FOR (@City = 'Paris'))
+END
+GO
+
+
+EXEC GetAllDataForCity 'Dresden'
+GO
+
+EXEC GetAllDataForCity 'Paris'
+GO
+
+
+-- Rozwiązanie 6
+-- Zagnieżdżone procedury
+CREATE OR ALTER PROC GetAllDataForCityParis @City nvarchar(30)
+AS
+BEGIN
+	SELECT ID, FirstName, LastName FROM AllData WHERE City = @City
+END
+GO
+
+CREATE OR ALTER PROC GetAllDataForCityAll @City nvarchar(30)
+AS
+BEGIN
+	SELECT ID, FirstName, LastName FROM AllData WHERE City = @City
+END
+GO
+
+
+CREATE OR ALTER PROC GetAllDataForCity @City nvarchar(30)
+AS
+BEGIN
+	
+	IF @City = 'Paris'
+	  EXEC GetAllDataForCityParis @City
+	ELSE 
+	  EXEC GetAllDataForCityAll @City
+
+END
+GO
+
+
+EXEC GetAllDataForCity 'Dresden'
+GO
+
+EXEC GetAllDataForCity 'Paris'
+GO
+
+
+
+-- Rozwiązanie 7
+-- Wyłączenie Parameter Snifffing na poziomie bazy danych
+
+ALTER DATABASE SCOPED CONFIGURATION SET PARAMETER_SNIFFING = ON
+GO
+
+-- Cleanup
+DROP PROC IF EXISTS GetAllDataForCityAll
+DROP PROC IF EXISTS GetAllDataForCityParis
+DROP PROC IF EXISTS GetAllDataForCity
+DROP PROC IF EXISTS GetProductsForSalesOrderID
