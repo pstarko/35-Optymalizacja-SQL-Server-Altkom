@@ -1,0 +1,122 @@
+--Aktualizacja
+
+CREATE CLUSTERED INDEX IDX_CL_AllData_ID ON AllData (ID)
+GO
+
+CREATE NONCLUSTERED INDEX IDX_NCL_AllData_City ON AllData (City)
+GO
+
+SELECT * FROM sys.stats WHERE object_id = object_id('AllData')
+
+
+DBCC SHOW_STATISTICS ('AllData', IDX_NCL_AllData_City)
+
+SELECT sp.stats_id, 
+       name,  
+       last_updated, 
+       rows, 
+       rows_sampled, 
+       steps,
+       modification_counter
+FROM sys.stats AS stat
+CROSS APPLY sys.dm_db_stats_properties(stat.object_id, stat.stats_id) AS sp
+WHERE stat.object_id = OBJECT_ID('AllData')
+
+ALTER INDEX IDX_NCL_AllData_City ON AllData REBUILD 
+
+--reorganizacja nie zmienia statystyk
+ALTER INDEX IDX_NCL_AllData_City ON AllData REORGANIZE
+
+
+/*
+	Automatyczna aktualizacja statystyk
+
+*/
+
+
+CREATE CLUSTERED INDEX IDX_CL_AllData_ID ON AllData (ID)
+GO
+
+-- statystyki indeksu
+CREATE INDEX IDX_CL_AllData_City ON AllData (City)
+GO
+
+-- statystyki automatyczne
+SELECT * FROM AllData WHERE LastName = 'Ford'
+
+-- statystyki kolumny
+CREATE STATISTICS stat_AllData_Firstname
+ON AllData (Firstname)  
+
+SELECT sp.stats_id, 
+       name,  
+       last_updated, 
+       rows, 
+       rows_sampled, 
+       steps, 
+       unfiltered_rows, 
+       modification_counter
+FROM sys.stats AS stat
+CROSS APPLY sys.dm_db_stats_properties(stat.object_id, stat.stats_id) AS sp
+WHERE stat.object_id = OBJECT_ID('AllData')
+
+select 500 + (0.2 * 37548)
+select sqrt(1000 * 37548)
+--8009.6
+
+--6127,64228720966
+
+UPDATE TOP (7000) AllData
+SET City = CONCAT(City, '_1'), FirstName = CONCAT(FirstName, '_1'), LastName = CONCAT(LastName, '_1')
+
+--uruchamiam jakiekolwiek zapytanie na kolumnie
+SELECT * FROM AllData WHERE FirstName = ''
+
+SELECT * FROM AllData WHERE LastName = ''
+
+
+select 500 + (0.2 * 2500000)
+select sqrt(1000 * 2500000) -> 50 000
+
+/*
+	Ręczna aktualizacja statystyk
+*/
+
+CREATE STATISTICS stat_AllData_Lastname
+ON AllData (Lastname)  
+
+-- aktualizacja wszystkich statystyk w tabeli AllData (próbka wierszy)
+UPDATE STATISTICS AllData
+
+-- aktualizacja statystyk kolumn (niezwiązane z indeksami)
+UPDATE STATISTICS AllData WITH COLUMNS
+
+SELECT sp.stats_id, 
+       name,  
+       last_updated, 
+       rows, 
+       rows_sampled, 
+       steps, 
+       unfiltered_rows, 
+       modification_counter
+FROM sys.stats AS stat
+CROSS APPLY sys.dm_db_stats_properties(stat.object_id, stat.stats_id) AS sp
+WHERE stat.object_id = OBJECT_ID('AllData')
+
+-- aktualizacja statystyk indeksów
+UPDATE STATISTICS AllData WITH INDEX
+
+-- aktualizacja wybranych statystyk 
+UPDATE STATISTICS AllData [stat_AllData_Firstname]
+
+UPDATE STATISTICS AllData [stat_AllData_Firstname] WITH FULLSCAN
+
+-- aktualizuje statystyki, dla tabel w których zmienił się choć jeden wiersz
+EXEC sp_updatestats 
+
+
+
+
+
+
+
