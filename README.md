@@ -2,10 +2,11 @@
 
 Witaj! Tu znajdziesz wszystkie materiały do szkolenia **Optymalizacja SQL Server**.
 
+Zoom: https://us06web.zoom.us/j/86259562195
 ---
 ## 📋 Godziny szkolenia:
 czwartek: 9:00 - 15:00 <br>
-piątek: 8:30 - 15:30 <br>
+piątek: 9:00 - 15:30 <br>
 
 ## 📋 Wymagania wstępne
 
