@@ -1,0 +1,55 @@
+/*
+	Plan Guides
+*/
+
+
+SET STATISTICS IO ON
+GO
+
+dbcc freeproccache 
+
+
+CREATE CLUSTERED INDEX IDX_CL_AllData_ID ON AllData (ID)
+GO
+
+CREATE NONCLUSTERED INDEX IDX_NCL_AllData_City ON AllData (City)
+GO
+
+
+CREATE OR ALTER PROC GetCity @City varchar(100)
+AS
+	SELECT * from AllData where City = @City
+GO
+
+EXEC GetCity 'Dresden'
+
+EXEC GetCity 'Paris'
+go
+
+
+sp_create_plan_guide   
+@name = N'Guide1',  
+@stmt = N'SELECT * from AllData where City = @City',  
+@type = N'OBJECT',  
+@module_or_batch = N'dbo.GetCity',  
+@params = NULL,  
+@hints = N'OPTION (OPTIMIZE FOR (@City = ''Paris''))';  
+
+-- lista plan guides
+SELECT *FROM sys.plan_guides
+
+EXEC GetCity 'Dresden' WITH RECOMPILE
+EXEC GetCity 'Paris' WITH RECOMPILE
+
+/*
+
+SQL Server stosuje następującą hierarchię pierwszeństwa:
+
+	Plan Guide (najwyższy priorytet)
+	Query Store forced plan
+	Automatyczny dobór planu przez optymalizator
+
+*/
+
+
+
